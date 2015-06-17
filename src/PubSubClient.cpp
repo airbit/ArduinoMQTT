@@ -229,6 +229,8 @@ bool PubSubClient::loop() {
     if (_client.available()) {
         // Read the packet and check it
         MQTT::Message *msg = MQTT::readPacket(_client);
+        Serial.print("Received message: ");
+        Serial.println(msg->type());
         if (msg != NULL) {
             _process_message(msg);
             delete msg;

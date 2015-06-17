@@ -39,6 +39,8 @@ void callback(const MQTT::Publish& pub, void*pdata) {
   // as the orignal payload buffer will be overwritten whilst
   // constructing the PUBLISH packet.
 
+    Serial.println((char*)pub.payload());
+
   // Copy the payload to a new message
   MQTT::Publish newpub("outTopic", pub.payload(), pub.payload_len());
   client.publish(newpub);

@@ -1,7 +1,7 @@
 set(CMAKE_TOOLCHAIN_FILE ~/Dev/github/energia-cmake/cmake/EnergiaToolchain.cmake)
 
 cmake_minimum_required(VERSION 3.1)
-project(dolink)
+project(ArduinoMQTT)
 
 set(CMAKE_VERBOSE_MAKEFILE on)
 
@@ -17,7 +17,7 @@ file(GLOB SRC_FILES
     src/*.cpp
     *.cpp)
 
-generate_energia_library(dolink
+generate_energia_library(ArduinoMQTT
     HDRS ${INC_FILES}
     SRCS ${SRC_FILES})
 

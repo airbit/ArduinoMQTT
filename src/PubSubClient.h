@@ -16,101 +16,122 @@
 
 class PubSubClient {
 public:
-  typedef void (*callback_t)(const MQTT::Publish&);
+
+    typedef void (*callback_t)(const MQTT::Publish &, void *data);
 
 private:
-   IPAddress server_ip;
-   String server_hostname;
-   uint16_t server_port;
-   callback_t _callback;
+    IPAddress server_ip;
+    String server_hostname;
+    uint16_t server_port;
+    callback_t _callback;
+    void * _callback_data;
 
-   WiFiClient _client;
-   uint16_t nextMsgId, keepalive;
-   uint8_t _max_retries;
-   unsigned long lastOutActivity;
-   unsigned long lastInActivity;
-   bool pingOutstanding;
+    WiFiClient _client;
+    uint16_t nextMsgId, keepalive;
+    uint8_t _max_retries;
+    unsigned long lastOutActivity;
+    unsigned long lastInActivity;
+    bool pingOutstanding;
 
-   // Internal function used by wait_for() and loop()
-   bool _process_message(MQTT::Message* msg, uint8_t wait_type = 0, uint16_t wait_pid = 0);
+    // Internal function used by wait_for() and loop()
+    bool _process_message(MQTT::Message *msg, uint8_t wait_type = 0, uint16_t wait_pid = 0);
 
-   // Wait for a certain type of packet to come back, optionally check its packet id
-   bool wait_for(uint8_t wait_type, uint16_t wait_pid = 0);
+    // Wait for a certain type of packet to come back, optionally check its packet id
+    bool wait_for(uint8_t wait_type, uint16_t wait_pid = 0);
 
-   bool send_reliably(MQTT::Message* msg);
+    bool send_reliably(MQTT::Message *msg);
 
 public:
-   // Empty constructor - use set_server() later, before connect()
-   PubSubClient();
+    // Empty constructor - use set_server() later, before connect()
+    PubSubClient();
 
-   // Constructors with the server ip address or host name
-   PubSubClient(IPAddress &ip, uint16_t port = 1883);
-   PubSubClient(String hostname, uint16_t port = 1883);
+    // Constructors with the server ip address or host name
+    PubSubClient(IPAddress &ip, uint16_t port = 1883);
 
-   // Set the server ip address or host name
-   PubSubClient& set_server(IPAddress &ip, uint16_t port = 1883);
-   PubSubClient& set_server(String hostname, uint16_t port = 1883);
+    PubSubClient(String hostname, uint16_t port = 1883);
 
-   // Get or set the callback function
-   callback_t callback(void) const { return _callback; }
-   PubSubClient& set_callback(callback_t cb) { _callback = cb; return *this; }
-   PubSubClient& unset_callback(void) { _callback = NULL; return * this; }
+    // Set the server ip address or host name
+    PubSubClient &set_server(IPAddress &ip, uint16_t port = 1883);
 
-   // Set the maximum number of retries when waiting for response packets
-   PubSubClient& set_max_retries(uint8_t mr) { _max_retries = mr; return *this; }
+    PubSubClient &set_server(String hostname, uint16_t port = 1883);
 
-   // Connect to the server with a client id
-   bool connect(String id);
+    // Get or set the callback function
+    callback_t callback(void) const { return _callback; }
 
-   // Connect to the server with a client id and "will" parameters
-   bool connect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage);
+    PubSubClient &set_callback(callback_t cb, void *data = NULL) {
+        _callback = cb;
+        _callback_data = data;
+        return *this;
+    }
 
-   #ifdef __AIRBIT_CC3200__
-   // Connect to the server with a client id
-   bool sslconnect(String id);
+    PubSubClient &unset_callback(void) {
+        _callback = NULL;
+        _callback_data = NULL;
+        return *this;
+    }
 
-   // Connect to the server with a client id and "will" parameters
-   bool sslconnect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage);
-   #endif
+    // Set the maximum number of retries when waiting for response packets
+    PubSubClient &set_max_retries(uint8_t mr) {
+        _max_retries = mr;
+        return *this;
+    }
 
-   // Disconnect from the server
-   void disconnect(void);
+    // Connect to the server with a client id
+    bool connect(String id);
 
-   // Publish a string payload
-   bool publish(String topic, String payload);
+    // Connect to the server with a client id and "will" parameters
+    bool connect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage);
 
-   // Publish an arbitrary data payload
-   bool publish(String topic, const uint8_t *payload, unsigned int plength, bool retained = false);
+#ifdef __AIRBIT_CC3200__
+    // Connect to the server with a client id
+    bool sslconnect(String id);
 
-   // Publish an arbitrary data payload stored in "program memory"
-   bool publish_P(String topic, PGM_P payload, unsigned int, bool retained = false);
+    // Connect to the server with a client id and "will" parameters
+    bool sslconnect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage);
 
-   // Subscribe to a topic
-   bool subscribe(String topic, uint8_t qos = 0);
+#endif
 
-   // Unsubscribe from a topic
-   bool unsubscribe(String topic);
+    // Disconnect from the server
+    void disconnect(void);
 
-   // Wait for packets to come in, processing them
-   // Also periodically pings the server
-   bool loop();
+    // Publish a string payload
+    bool publish(String topic, String payload);
 
-   // Are we connected?
-   bool connected();
+    // Publish an arbitrary data payload
+    bool publish(String topic, const uint8_t *payload, unsigned int plength, bool retained = false);
 
-   // Return the next packet id
-   // Needed for constructing our own publish (with QoS>0) or (un)subscribe messages
-   uint16_t next_packet_id(void) {
-     nextMsgId++;
-     if (nextMsgId == 0) nextMsgId = 1;
-     return nextMsgId;
-   }
+    // Publish an arbitrary data payload stored in "program memory"
+    bool publish_P(String topic, PGM_P payload, unsigned int, bool retained = false);
 
-   // New methods that take pre-constructed MQTT message objects
-   bool connect(MQTT::Connect &conn, bool ssl = false);
-   bool publish(MQTT::Publish &pub);
-   bool subscribe(MQTT::Subscribe &sub);
-   bool unsubscribe(MQTT::Unsubscribe &unsub);
+    // Subscribe to a topic
+    bool subscribe(String topic, uint8_t qos = 0);
+
+    // Unsubscribe from a topic
+    bool unsubscribe(String topic);
+
+    // Wait for packets to come in, processing them
+    // Also periodically pings the server
+    bool loop();
+
+    // Are we connected?
+    bool connected();
+
+    // Return the next packet id
+    // Needed for constructing our own publish (with QoS>0) or (un)subscribe messages
+    uint16_t next_packet_id(void) {
+        nextMsgId++;
+        if (nextMsgId == 0) nextMsgId = 1;
+        return nextMsgId;
+    }
+
+    // New methods that take pre-constructed MQTT message objects
+    bool connect(MQTT::Connect &conn, bool ssl = false);
+
+    bool publish(MQTT::Publish &pub);
+
+    bool subscribe(MQTT::Subscribe &sub);
+
+    bool unsubscribe(MQTT::Unsubscribe &unsub);
 };
 
 

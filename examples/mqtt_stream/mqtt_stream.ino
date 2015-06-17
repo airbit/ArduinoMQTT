@@ -29,7 +29,7 @@ IPAddress server(10, 0, 0, 10);
 
 SRAM sram(4, SRAM_1024);
 
-void callback(const MQTT::Publish& pub) {
+void callback(const MQTT::Publish& pub, void*pdata) {
   sram.seek(1);
 
   // do something with the message

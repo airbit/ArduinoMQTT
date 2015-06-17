@@ -23,7 +23,7 @@
 // Update these with values suitable for your network.
 IPAddress server(10, 0, 0, 10);
 
-void callback(const MQTT::Publish& pub) {
+void callback(const MQTT::Publish& pub, void*pdata) {
   // handle message arrived
 }
 

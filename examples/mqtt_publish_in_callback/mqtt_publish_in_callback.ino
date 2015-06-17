@@ -34,7 +34,7 @@ IPAddress server(10, 0, 0, 10);
 PubSubClient client(server);
 
 // Callback function
-void callback(const MQTT::Publish& pub) {
+void callback(const MQTT::Publish& pub, void*pdata) {
   // In order to republish this payload, a copy must be made
   // as the orignal payload buffer will be overwritten whilst
   // constructing the PUBLISH packet.

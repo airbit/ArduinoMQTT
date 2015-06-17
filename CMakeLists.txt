@@ -5,7 +5,7 @@ project(dolink)
 
 set(CMAKE_VERBOSE_MAKEFILE on)
 
-set(ENERGIA_DEFAULT_BOARD witii_cc3200)
+set(ENERGIA_DEFAULT_BOARD airbit_cc3200)
 #set(ENERGIA_DEFAULT_PORT /dev/tty.usbserial-cc3101B)
 set(ENERGIA_DEFAULT_PORT /dev/tty.usbserial-AI02S970)
 

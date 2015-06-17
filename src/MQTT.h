@@ -20,8 +20,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #pragma once
 
 #include <stdint.h>
-#include <pgmspace.h>
-#include <WiFiClient.h>
+#include <avr/pgmspace.h>
+#include <WiFi/WiFiClient.h>
 
 // MQTT_MAX_PACKET_SIZE : Maximum packet size
 #define MQTT_MAX_PACKET_SIZE 128

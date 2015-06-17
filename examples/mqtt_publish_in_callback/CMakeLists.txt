@@ -1,0 +1,2 @@
+generate_energia_firmware(mqtt_publish_in_callback
+    SKETCH mqtt_publish_in_callback.ino)

@@ -9,13 +9,14 @@
 
 #include <functional>
 #include <Arduino.h>
-#include <pgmspace.h>
+#include <avr/pgmspace.h>
+#include <WiFi/WiFiClient.h>
 
 #include "MQTT.h"
 
 class PubSubClient {
 public:
-  typedef std::function<void(const MQTT::Publish&)> callback_t;
+  typedef void (*callback_t)(const MQTT::Publish&);
 
 private:
    IPAddress server_ip;

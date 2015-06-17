@@ -65,6 +65,14 @@ public:
    // Connect to the server with a client id and "will" parameters
    bool connect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage);
 
+   #ifdef __AIRBIT_CC3200__
+   // Connect to the server with a client id
+   bool sslconnect(String id);
+
+   // Connect to the server with a client id and "will" parameters
+   bool sslconnect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage);
+   #endif
+
    // Disconnect from the server
    void disconnect(void);
 
@@ -99,7 +107,7 @@ public:
    }
 
    // New methods that take pre-constructed MQTT message objects
-   bool connect(MQTT::Connect &conn);
+   bool connect(MQTT::Connect &conn, bool ssl = false);
    bool publish(MQTT::Publish &pub);
    bool subscribe(MQTT::Subscribe &sub);
    bool unsubscribe(MQTT::Unsubscribe &unsub);

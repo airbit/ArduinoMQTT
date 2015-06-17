@@ -152,16 +152,27 @@ bool PubSubClient::connect(String id, String willTopic, uint8_t willQos, bool wi
   return connect(conn);
 }
 
-bool PubSubClient::connect(MQTT::Connect &conn) {
+bool PubSubClient::connect(MQTT::Connect &conn, bool ssl) {
   if (connected())
     return false;
 
   int result = 0;
 
-  if (server_hostname.length() > 0)
-    result = _client.connect(server_hostname.c_str(), server_port);
-  else
-    result = _client.connect(server_ip, server_port);
+#ifdef __AIRBIT_CC3200__
+  if (ssl) {
+    if (server_hostname.length() > 0)
+      result = _client.sslConnect(server_hostname.c_str(), server_port);
+    else
+      result = _client.sslConnect(server_ip, server_port);
+  } else {
+#endif
+    if (server_hostname.length() > 0)
+      result = _client.connect(server_hostname.c_str(), server_port);
+    else
+      result = _client.connect(server_ip, server_port);
+#ifdef __AIRBIT_CC3200__
+  }
+#endif
 
   if (!result) {
     _client.stop();
@@ -179,6 +190,27 @@ bool PubSubClient::connect(MQTT::Connect &conn) {
 
   return ret;
 }
+
+#ifdef __AIRBIT_CC3200__
+// Connect to the server with a client id
+bool PubSubClient::sslconnect(String id) {
+  if (connected())
+    return false;
+
+  return sslconnect(id, "", 0, false, "");
+}
+
+// Connect to the server with a client id and "will" parameters
+bool PubSubClient::sslconnect(String id, String willTopic, uint8_t willQos, bool willRetain, String willMessage) {
+  if (connected())
+    return false;
+
+  MQTT::Connect conn(id);
+  if (willTopic.length())
+    conn.set_will(willTopic, willMessage, willQos, willRetain);
+  return connect(conn, true);
+}
+#endif
 
 bool PubSubClient::loop() {
   if (!connected())

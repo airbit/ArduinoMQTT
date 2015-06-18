@@ -244,8 +244,6 @@ bool PubSubClient::loop() {
             if (len > 0) {
                 lastInActivity = t;
                 uint8_t type = (uint8_t) (buffer[0] & 0xF0);
-                Serial.print("Received Packet: ");
-                Serial.println(type);
                 if (type == MQTTPUBLISH) {
                     MQTT::BufferedPublish pub(buffer[0], buffer + llen + 1, (size_t) (len - llen - 1));
                     if (_callback) {
@@ -259,7 +257,6 @@ bool PubSubClient::loop() {
                         buffer[3] = (uint8_t) (pub.packet_id() & 0xFF);
                         send(buffer, 4);
                         lastOutActivity = t;
-                        Serial.println("Sent QOS 1 Ack");
                     }
                 } else if (type == MQTTPINGREQ) {
                     buffer[0] = MQTTPINGRESP;

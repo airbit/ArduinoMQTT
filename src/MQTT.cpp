@@ -103,12 +103,12 @@ namespace MQTT {
         size_t real_len = remaining_length + fixed_len;
         memcpy(real_packet, fixed_header, fixed_len);
 
-        Serial.println("Sending Packet:");
-        for (int i = 0; i < real_len; ++i) {
-            Serial.print(real_packet[i]);
-            Serial.print(" ");
-        }
-        Serial.println();
+//        Serial.println("Sending Packet:");
+//        for (int i = 0; i < real_len; ++i) {
+//            Serial.print(real_packet[i]);
+//            Serial.print(" ");
+//        }
+//        Serial.println();
 
         // write with block to fix wired issue that client.write in cc3200 can not more than 100 bytes.
         size_t sent = 0;

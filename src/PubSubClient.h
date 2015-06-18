@@ -88,9 +88,9 @@ public:
 
     PubSubClient(String hostname, uint16_t port = 1883, bool ssl = false);
 
-    PubSubClient &set_setver(IPAddress &ip, uint16_t port = 1883, bool ssl = false);
+    PubSubClient &set_server(IPAddress &ip, uint16_t port = 1883, bool ssl = false);
 
-    PubSubClient &set_setver(String hostname, uint16_t port = 1883, bool ssl = false);
+    PubSubClient &set_server(String hostname, uint16_t port = 1883, bool ssl = false);
 
     PubSubClient &unset_server(void);
 

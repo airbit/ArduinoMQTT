@@ -29,14 +29,14 @@ PubSubClient::PubSubClient(String hostname, uint16_t port, bool ssl) :
         server_port(port),
         _ssl(ssl) { }
 
-PubSubClient &PubSubClient::set_setver(IPAddress &ip, uint16_t port, bool ssl) {
+PubSubClient &PubSubClient::set_server(IPAddress &ip, uint16_t port, bool ssl) {
     server_ip = ip;
     server_port = port;
     _ssl = ssl;
     return *this;
 }
 
-PubSubClient &PubSubClient::set_setver(String hostname, uint16_t port, bool ssl) {
+PubSubClient &PubSubClient::set_server(String hostname, uint16_t port, bool ssl) {
     server_hostname = hostname;
     server_port = port;
     _ssl = ssl;

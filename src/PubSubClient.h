@@ -13,15 +13,26 @@
 #include <IPAddress.h>
 #include "MQTT.h"
 
-// MQTT_MAX_PACKET_SIZE : Maximum packet size
-#ifdef __CC3200R1M1RGC__
-#define MQTT_MAX_PACKET_SIZE 1024
-#else
-#define MQTT_MAX_PACKET_SIZE 128
-#endif
+#define MQTTPROTOCOLVERSION 3
+#define MQTTCONNECT     1 << 4  // Client request to connect to Server
+#define MQTTCONNACK     2 << 4  // Connect Acknowledgment
+#define MQTTPUBLISH     3 << 4  // Publish message
+#define MQTTPUBACK      4 << 4  // Publish Acknowledgment
+#define MQTTPUBREC      5 << 4  // Publish Received (assured delivery part 1)
+#define MQTTPUBREL      6 << 4  // Publish Release (assured delivery part 2)
+#define MQTTPUBCOMP     7 << 4  // Publish Complete (assured delivery part 3)
+#define MQTTSUBSCRIBE   8 << 4  // Client Subscribe request
+#define MQTTSUBACK      9 << 4  // Subscribe Acknowledgment
+#define MQTTUNSUBSCRIBE 10 << 4 // Client Unsubscribe request
+#define MQTTUNSUBACK    11 << 4 // Unsubscribe Acknowledgment
+#define MQTTPINGREQ     12 << 4 // PING Request
+#define MQTTPINGRESP    13 << 4 // PING Response
+#define MQTTDISCONNECT  14 << 4 // Client is Disconnecting
+#define MQTTReserved    15 << 4 // Reserved
 
-#define MQTT_SEND_BLOCK_SIZE 100
-
+#define MQTTQOS0        (0 << 1)
+#define MQTTQOS1        (1 << 1)
+#define MQTTQOS2        (2 << 1)
 
 class PubSubClient {
 public:
@@ -47,6 +58,10 @@ private:
     size_t send(uint8_t c);
 
     size_t send(const uint8_t *buf, size_t len);
+
+    bool send(MQTT::Message &message);
+
+    bool sendReliably(MQTT::Message &message);
 
     uint16_t readPacket(uint8_t *);
 
@@ -105,6 +120,16 @@ public:
     bool loop();
 
     bool connected();
+
+    bool publish(MQTT::Publish &pub);
+
+    // Return the next packet id
+    // Needed for constructing our own publish (with QoS>0) or (un)subscribe messages
+    uint16_t next_packet_id(void) {
+        nextMsgId++;
+        if (nextMsgId == 0) nextMsgId = 1;
+        return nextMsgId;
+    }
 };
 
 

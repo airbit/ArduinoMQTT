@@ -5,36 +5,42 @@
 #ifndef MQTT_H
 #define MQTT_H
 
+#include <Arduino.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <WString.h>
+#include <Client.h>
 
-#define MAX_PAYLOAD_BUFFER_ZISE 8196
+// MQTT_MAX_PACKET_SIZE : Maximum packet size
+#ifdef __CC3200R1M1RGC__
+#define MQTT_MAX_PACKET_SIZE 1024
+#else
+#define MQTT_MAX_PACKET_SIZE 128
+#endif
 
+#define MQTT_MAX_PAYLOAD_SIZE 8196
+
+#define MQTT_SEND_BLOCK_SIZE 64
 
 // MQTT_KEEPALIVE : keepAlive interval in Seconds
 #define MQTT_KEEPALIVE 15
 
-#define MQTTPROTOCOLVERSION 3
-#define MQTTCONNECT     1 << 4  // Client request to connect to Server
-#define MQTTCONNACK     2 << 4  // Connect Acknowledgment
-#define MQTTPUBLISH     3 << 4  // Publish message
-#define MQTTPUBACK      4 << 4  // Publish Acknowledgment
-#define MQTTPUBREC      5 << 4  // Publish Received (assured delivery part 1)
-#define MQTTPUBREL      6 << 4  // Publish Release (assured delivery part 2)
-#define MQTTPUBCOMP     7 << 4  // Publish Complete (assured delivery part 3)
-#define MQTTSUBSCRIBE   8 << 4  // Client Subscribe request
-#define MQTTSUBACK      9 << 4  // Subscribe Acknowledgment
-#define MQTTUNSUBSCRIBE 10 << 4 // Client Unsubscribe request
-#define MQTTUNSUBACK    11 << 4 // Unsubscribe Acknowledgment
-#define MQTTPINGREQ     12 << 4 // PING Request
-#define MQTTPINGRESP    13 << 4 // PING Response
-#define MQTTDISCONNECT  14 << 4 // Client is Disconnecting
-#define MQTTReserved    15 << 4 // Reserved
+#define MQTT_CONNECT     1  // Client request to connect to Server
+#define MQTT_CONNACK     2  // Connect Acknowledgment
+#define MQTT_PUBLISH     3  // Publish message
+#define MQTT_PUBACK      4  // Publish Acknowledgment
+#define MQTT_PUBREC      5  // Publish Received (assured delivery part 1)
+#define MQTT_PUBREL      6  // Publish Release (assured delivery part 2)
+#define MQTT_PUBCOMP     7  // Publish Complete (assured delivery part 3)
+#define MQTT_SUBSCRIBE   8  // Client Subscribe request
+#define MQTT_SUBACK      9  // Subscribe Acknowledgment
+#define MQTT_UNSUBSCRIBE 10 // Client Unsubscribe request
+#define MQTT_UNSUBACK    11 // Unsubscribe Acknowledgment
+#define MQTT_PINGREQ     12 // PING Request
+#define MQTT_PINGRESP    13 // PING Response
+#define MQTT_DISCONNECT  14 // Client is Disconnecting
+#define MQTT_Reserved    15 // Reserved
 
-#define MQTTQOS0        (0 << 1)
-#define MQTTQOS1        (1 << 1)
-#define MQTTQOS2        (2 << 1)
 
 namespace MQTT {
     class Message {
@@ -50,7 +56,23 @@ namespace MQTT {
                 _type(t), _flags(0),
                 _packet_id(pid) { }
 
+        // Write the fixed header to a buffer
+        bool write_fixed_header(uint8_t *buf, size_t &bufpos, size_t rlength);
+
+        bool write_packet_id(uint8_t *buf, size_t &bufpos);
+
+        // Abstract methods to be implemented by derived classes
+        virtual bool write_variable_header(uint8_t *buf, size_t &bufpos) = 0;
+
+        virtual bool write_payload(uint8_t *buf, size_t &bufpos) { }
+
+        virtual uint8_t response_type(void) const { return 0; }
+
     public:
+        // Send the message out
+        bool send(Stream &stream, size_t block_size = MQTT_SEND_BLOCK_SIZE);
+        bool send(Stream &stream, uint8_t *buffer, size_t block_size = MQTT_SEND_BLOCK_SIZE);
+
         // Get the message type
         uint8_t type(void) const { return _type; }
 
@@ -64,6 +86,12 @@ namespace MQTT {
         uint8_t *_payload;
         size_t _payload_len;
 
+        bool write_variable_header(uint8_t *buf, size_t &bufpos);
+
+        bool write_payload(uint8_t *buf, size_t &bufpos);
+
+        uint8_t response_type(void) const;
+
         virtual void init(String topic, uint8_t *payload, size_t len) {
             _topic = topic;
             _payload = payload;
@@ -72,12 +100,20 @@ namespace MQTT {
 
     public:
         Publish() :
-                Message(MQTTPUBLISH),
+                Message(MQTT_PUBLISH),
                 _payload(NULL) { }
 
-        Publish(char *topic, uint8_t *payload, size_t len) :
-                Message(MQTTPUBLISH) {
+        Publish(String topic, uint8_t *payload, size_t len) :
+                Message(MQTT_PUBLISH) {
             init(topic, payload, len);
+        }
+
+        Publish(String topic, const char *payload, size_t len = 0) :
+                Message(MQTT_PUBLISH) {
+            if (len == 0) {
+                len = strlen(payload);
+            }
+            init(topic, (uint8_t *) payload, len);
         }
 
         // Get or set retain flag
@@ -137,14 +173,14 @@ namespace MQTT {
 
     class BufferedPublish : public Publish {
     protected:
-        uint8_t _buffer[MAX_PAYLOAD_BUFFER_ZISE];
+        uint8_t _buffer[MQTT_MAX_PAYLOAD_SIZE];
 
         virtual void init(String topic, uint8_t *payload, size_t len) {
             _topic = topic;
             _payload_len = len;
 
             memcpy(_buffer, payload, len);
-            memset(_buffer + len, 0, MAX_PAYLOAD_BUFFER_ZISE - len);
+            memset(_buffer + len, 0, MQTT_MAX_PAYLOAD_SIZE - len);
         }
 
     public:
@@ -155,7 +191,7 @@ namespace MQTT {
         BufferedPublish(String topic, String &payload) {
             _topic = topic;
             _payload_len = 0;
-            memset(_buffer, 0, MAX_PAYLOAD_BUFFER_ZISE);
+            memset(_buffer, 0, MQTT_MAX_PAYLOAD_SIZE);
             if (payload.length() > 0) {
                 memcpy(_buffer, payload.c_str(), payload.length());
                 _payload_len = payload.length();
@@ -171,7 +207,7 @@ namespace MQTT {
         BufferedPublish(String topic, PGM_P payload, size_t length) {
             _topic = topic;
             _payload_len = length;
-            memset(_buffer, 0, MAX_PAYLOAD_BUFFER_ZISE);
+            memset(_buffer, 0, MQTT_MAX_PAYLOAD_SIZE);
             memcpy_P(_buffer, payload, length);
         }
 

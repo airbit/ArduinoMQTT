@@ -39,7 +39,10 @@ void callback(const MQTT::Publish &pub, void *pdata) {
     // as the orignal payload buffer will be overwritten whilst
     // constructing the PUBLISH packet.
 
-    client.publish("outTopic", pub.payload(), pub.payload_len());
+//    client.publish("outTopic", pub.payload(), pub.payload_len());
+    // Copy the payload to a new message
+    MQTT::BufferedPublish newpub("outTopic", pub.payload(), pub.payload_len());
+    client.publish(newpub);
 }
 
 void setup() {

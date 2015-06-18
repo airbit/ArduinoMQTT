@@ -244,6 +244,8 @@ bool PubSubClient::loop() {
             if (len > 0) {
                 lastInActivity = t;
                 uint8_t type = (uint8_t) (buffer[0] & 0xF0);
+                Serial.print("Received Packet: ");
+                Serial.println(type);
                 if (type == MQTTPUBLISH) {
                     MQTT::BufferedPublish pub(buffer[0], buffer + llen + 1, (size_t) (len - llen - 1));
                     if (_callback) {
@@ -259,33 +261,6 @@ bool PubSubClient::loop() {
                         lastOutActivity = t;
                         Serial.println("Sent QOS 1 Ack");
                     }
-
-//                  if (_callback) {
-//                        uint16_t tl = (buffer[llen + 1] << 8) | buffer[llen + 2];
-//                        char topic[tl + 1];
-//                        memcpy(topic, buffer + llen + 3, tl);
-//                        topic[tl] = 0;
-//                        // msgId only present for QOS>0
-//                        if ((buffer[0] & 0x06) == MQTTQOS1) {
-//                            msgId = (buffer[llen + 3 + tl] << 8) | buffer[llen + 3 + tl + 1];
-//                            payload = buffer + llen + 3 + tl + 2;
-//
-//                            MQTT::BufferedPublish pub(topic, payload, (size_t) (len - llen - 3 - tl - 2));
-//                            _callback(pub, _callback_data);
-//
-//                            buffer[0] = MQTTPUBACK;
-//                            buffer[1] = 2;
-//                            buffer[2] = (uint8_t) (msgId >> 8);
-//                            buffer[3] = (uint8_t) (msgId & 0xFF);
-//                            send(buffer, 4);
-//                            lastOutActivity = t;
-//
-//                        } else {
-//                            payload = buffer + llen + 3 + tl;
-//                            MQTT::BufferedPublish pub(topic, payload, (size_t) (len - llen - 3 - tl));
-//                            _callback(pub, _callback_data);
-//                        }
-//                    }
                 } else if (type == MQTTPINGREQ) {
                     buffer[0] = MQTTPINGRESP;
                     buffer[1] = 0;
@@ -306,18 +281,9 @@ bool PubSubClient::publish(String topic, String payload) {
 
 bool PubSubClient::publish(String topic, const uint8_t *payload, unsigned int plength, bool retained) {
     if (connected()) {
-        // Leave room in the buffer for header and variable length field
-        uint16_t length = 5;
-        length = writeString(topic, buffer, length);
-
-        memcpy(buffer + length, payload, plength);
-        length += plength;
-
-        uint8_t header = MQTTPUBLISH;
-        if (retained) {
-            header |= 1;
-        }
-        return write(header, buffer, (uint16_t) (length - 5));
+        MQTT::Publish pub(topic, (uint8_t *)payload, plength);
+        pub.set_retain(retained);
+        return publish(pub);
     }
     return false;
 }
@@ -472,5 +438,42 @@ size_t PubSubClient::send(uint8_t c) {
     return _client.write(c);
 }
 
+bool PubSubClient::send(MQTT::Message &message) {
+    return message.send(_client, buffer);
+}
 
+bool PubSubClient::publish(MQTT::Publish &pub) {
+    if (!connected())
+        return false;
 
+    switch (pub.qos()) {
+        case 0:
+            send(pub);
+            lastOutActivity = millis();
+            break;
+
+        case 1:
+            if (!sendReliably(pub))
+                return false;
+            break;
+
+//        case 2:
+//            if (!send_reliably(&pub))
+//                return false;
+//
+//            MQTT::PublishRel pubrel(pub.packet_id());
+//            if (!send_reliably(&pubrel))
+//                return false;
+//
+//            break;
+        default:
+            break;
+    }
+    lastOutActivity = millis();
+    return true;
+}
+
+bool PubSubClient::sendReliably(MQTT::Message &message) {
+    // TODO implement send reliably
+    return send(message);
+}

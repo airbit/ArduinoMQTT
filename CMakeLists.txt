@@ -24,7 +24,7 @@ generate_energia_library(ArduinoMQTT
 add_subdirectory(examples/mqtt_auth)
 add_subdirectory(examples/mqtt_basic)
 add_subdirectory(examples/mqtt_publish_in_callback)
-#add_subdirectory(examples/mqtt_qos)
+add_subdirectory(examples/mqtt_qos)
 add_subdirectory(examples/mqtt_ssl)
 #add_subdirectory(examples/mqtt_stream)
 add_subdirectory(examples/mqtt_subscriber)

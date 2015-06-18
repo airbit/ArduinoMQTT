@@ -241,40 +241,51 @@ bool PubSubClient::loop() {
         if (_client.available()) {
             uint8_t llen;
             uint16_t len = readPacket(&llen);
-            uint16_t msgId = 0;
-            uint8_t *payload;
             if (len > 0) {
                 lastInActivity = t;
                 uint8_t type = (uint8_t) (buffer[0] & 0xF0);
                 if (type == MQTTPUBLISH) {
+                    MQTT::BufferedPublish pub(buffer[0], buffer + llen + 1, (size_t) (len - llen - 1));
                     if (_callback) {
-                        uint16_t tl = (buffer[llen + 1] << 8) | buffer[llen + 2];
-                        char topic[tl + 1];
-                        memcpy(topic, buffer + llen + 3, tl);
-                        topic[tl] = 0;
-                        // msgId only present for QOS>0
-                        if ((buffer[0] & 0x06) == MQTTQOS1) {
-                            msgId = (buffer[llen + 3 + tl] << 8) | buffer[llen + 3 + tl + 1];
-                            payload = buffer + llen + 3 + tl + 2;
-
-                            MQTT::StaticPublish pub(topic, payload, (size_t) (len - llen - 3 - tl - 2));
-                            _callback(pub, _callback_data);
-//                            _callback(topic, payload, (unsigned int) (len - llen - 3 - tl - 2), _callback_data);
-
-                            buffer[0] = MQTTPUBACK;
-                            buffer[1] = 2;
-                            buffer[2] = (uint8_t) (msgId >> 8);
-                            buffer[3] = (uint8_t) (msgId & 0xFF);
-                            send(buffer, 4);
-                            lastOutActivity = t;
-
-                        } else {
-                            payload = buffer + llen + 3 + tl;
-                            MQTT::StaticPublish pub(topic, payload, (size_t) (len - llen - 3 - tl));
-                            _callback(pub, _callback_data);
-//                            _callback(topic, payload, (unsigned int) (len - llen - 3 - tl), _callback_data);
-                        }
+                        _callback(pub, _callback_data);
                     }
+
+                    if (pub.qos() == 1) {
+                        buffer[0] = MQTTPUBACK;
+                        buffer[1] = 2;
+                        buffer[2] = (uint8_t) (pub.packet_id() >> 8);
+                        buffer[3] = (uint8_t) (pub.packet_id() & 0xFF);
+                        send(buffer, 4);
+                        lastOutActivity = t;
+                        Serial.println("Sent QOS 1 Ack");
+                    }
+
+//                  if (_callback) {
+//                        uint16_t tl = (buffer[llen + 1] << 8) | buffer[llen + 2];
+//                        char topic[tl + 1];
+//                        memcpy(topic, buffer + llen + 3, tl);
+//                        topic[tl] = 0;
+//                        // msgId only present for QOS>0
+//                        if ((buffer[0] & 0x06) == MQTTQOS1) {
+//                            msgId = (buffer[llen + 3 + tl] << 8) | buffer[llen + 3 + tl + 1];
+//                            payload = buffer + llen + 3 + tl + 2;
+//
+//                            MQTT::BufferedPublish pub(topic, payload, (size_t) (len - llen - 3 - tl - 2));
+//                            _callback(pub, _callback_data);
+//
+//                            buffer[0] = MQTTPUBACK;
+//                            buffer[1] = 2;
+//                            buffer[2] = (uint8_t) (msgId >> 8);
+//                            buffer[3] = (uint8_t) (msgId & 0xFF);
+//                            send(buffer, 4);
+//                            lastOutActivity = t;
+//
+//                        } else {
+//                            payload = buffer + llen + 3 + tl;
+//                            MQTT::BufferedPublish pub(topic, payload, (size_t) (len - llen - 3 - tl));
+//                            _callback(pub, _callback_data);
+//                        }
+//                    }
                 } else if (type == MQTTPINGREQ) {
                     buffer[0] = MQTTPINGRESP;
                     buffer[1] = 0;
@@ -450,7 +461,7 @@ size_t PubSubClient::send(const uint8_t *buf, size_t len) {
     size_t ret = 0;
 
     while (sent < len) {
-        count = min(len - sent, MQTT_SEND_BLICK_SIZE);
+        count = min(len - sent, MQTT_SEND_BLOCK_SIZE);
         sent += (ret = _client.write(buf + sent, count));
         if (ret != count) break;
     }

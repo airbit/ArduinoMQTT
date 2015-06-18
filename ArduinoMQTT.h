@@ -5,6 +5,7 @@
 #ifndef ARDUINO_MQTT_H
 #define ARDUINO_MQTT_H
 
+#include "src/MQTT.h"
 #include "src/PubSubClient.h"
 
 #endif //ARDUINO_MQTT_H

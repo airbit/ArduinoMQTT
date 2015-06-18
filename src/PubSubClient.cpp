@@ -156,10 +156,10 @@ bool PubSubClient::connect(String id, String willTopic, uint8_t willQos, bool wi
                     return false;
                 }
             }
-            uint8_t llen;
-            uint16_t len = readPacket(&llen);
 
-            if (len == 4 && buffer[3] == 0) {
+            mqtt_packet_t packet = readPacket();
+
+            if (packet.total == 4 && buffer[3] == 0) {
                 lastInActivity = millis();
                 pingOutstanding = false;
                 return true;
@@ -175,7 +175,10 @@ uint8_t PubSubClient::readByte() {
     return (uint8_t) _client.read();
 }
 
-uint16_t PubSubClient::readPacket(uint8_t *lengthLength) {
+mqtt_packet_t PubSubClient::readPacket() {
+    mqtt_packet_t packet;
+
+    uint16_t lensize;
     uint16_t len = 0;
     buffer[len++] = readByte();
     bool isPublish = (buffer[0] & 0xF0) == MQTTPUBLISH;
@@ -191,13 +194,13 @@ uint16_t PubSubClient::readPacket(uint8_t *lengthLength) {
         length += (digit & 0x7f) << shifter;
         shifter += 7;
     } while (digit & 0x80);
-    *lengthLength = (uint8_t) (len - 1);
+    lensize = (uint8_t) (len - 1);
 
     if (isPublish) {
         // Read in topic length to calculate bytes to skip over for Stream writing
         buffer[len++] = readByte();
         buffer[len++] = readByte();
-        skip = (buffer[*lengthLength + 1] << 8) | buffer[*lengthLength + 2];
+        skip = (buffer[lensize + 1] << 8) | buffer[lensize + 2];
         start = 2;
         if (buffer[0] & MQTTQOS1) {
             // skip message id
@@ -207,7 +210,7 @@ uint16_t PubSubClient::readPacket(uint8_t *lengthLength) {
 
     for (uint16_t i = start; i < length; i++) {
         digit = readByte();
-        if (_stream) if (isPublish && len - *lengthLength - 2 > skip)
+        if (_stream) if (isPublish && len - lensize - 2 > skip)
             send(digit);
         if (len < MQTT_MAX_PACKET_SIZE) {
             buffer[len] = digit;
@@ -219,8 +222,41 @@ uint16_t PubSubClient::readPacket(uint8_t *lengthLength) {
         len = 0; // This will cause the packet to be ignored.
     }
 
-    return len;
+    packet.header = buffer[0];
+    packet.data = buffer + lensize + 1;
+    packet.length = (size_t) (len - lensize - 1);
+    packet.total = len;
+
+    return packet;
 }
+
+bool PubSubClient::processPacket(mqtt_packet_t &packet, uint8_t wait_type, uint16_t wait_pid) {
+    uint8_t type = (uint8_t) (buffer[0] & 0xF0);
+
+    if (type == MQTTPUBLISH) {
+        MQTT::BufferedPublish pub(packet.header, packet.data, packet.length);
+        if (_callback) {
+            _callback(pub, _callback_data);
+        }
+
+        if (pub.qos() == 1) {
+            buffer[0] = MQTTPUBACK;
+            buffer[1] = 2;
+            buffer[2] = (uint8_t) (pub.packet_id() >> 8);
+            buffer[3] = (uint8_t) (pub.packet_id() & 0xFF);
+            send(buffer, 4);
+            lastOutActivity = millis();
+        }
+    } else if (type == MQTTPINGREQ) {
+        buffer[0] = MQTTPINGRESP;
+        buffer[1] = 0;
+        send(buffer, 2);
+    } else if (type == MQTTPINGRESP) {
+        pingOutstanding = false;
+    }
+    return false;
+}
+
 
 bool PubSubClient::loop() {
     if (connected()) {
@@ -239,33 +275,12 @@ bool PubSubClient::loop() {
             }
         }
         if (_client.available()) {
-            uint8_t llen;
-            uint16_t len = readPacket(&llen);
-            if (len > 0) {
+            mqtt_packet_t packet = readPacket();
+            if (packet.length > 0) {
                 lastInActivity = t;
-                uint8_t type = (uint8_t) (buffer[0] & 0xF0);
-                if (type == MQTTPUBLISH) {
-                    MQTT::BufferedPublish pub(buffer[0], buffer + llen + 1, (size_t) (len - llen - 1));
-                    if (_callback) {
-                        _callback(pub, _callback_data);
-                    }
-
-                    if (pub.qos() == 1) {
-                        buffer[0] = MQTTPUBACK;
-                        buffer[1] = 2;
-                        buffer[2] = (uint8_t) (pub.packet_id() >> 8);
-                        buffer[3] = (uint8_t) (pub.packet_id() & 0xFF);
-                        send(buffer, 4);
-                        lastOutActivity = t;
-                    }
-                } else if (type == MQTTPINGREQ) {
-                    buffer[0] = MQTTPINGRESP;
-                    buffer[1] = 0;
-                    send(buffer, 2);
-                } else if (type == MQTTPINGRESP) {
-                    pingOutstanding = false;
-                }
+                processPacket(packet);
             }
+
         }
         return true;
     }

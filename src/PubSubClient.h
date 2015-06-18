@@ -34,11 +34,19 @@
 #define MQTTQOS1        (1 << 1)
 #define MQTTQOS2        (2 << 1)
 
+struct mqtt_packet_t {
+    uint8_t header;
+    uint8_t *data;
+    size_t length;
+    size_t total;
+};
+
 class PubSubClient {
 public:
     typedef void(*callback_t)(const MQTT::Publish &, void *);
 
 private:
+
     IPAddress server_ip;
     String server_hostname;
     uint16_t server_port;
@@ -63,13 +71,15 @@ private:
 
     bool sendReliably(MQTT::Message &message);
 
-    uint16_t readPacket(uint8_t *);
+    mqtt_packet_t readPacket();
 
     uint8_t readByte();
 
     bool write(uint8_t header, uint8_t *buf, uint16_t length);
 
     uint16_t writeString(String string, uint8_t *buf, uint16_t pos);
+
+    bool processPacket(mqtt_packet_t &packet, uint8_t wait_type = 0, uint16_t wait_pid = 0);
 
 
 public:

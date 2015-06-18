@@ -41,7 +41,6 @@
 #define MQTT_DISCONNECT  14 // Client is Disconnecting
 #define MQTT_Reserved    15 // Reserved
 
-
 namespace MQTT {
     class Message {
     protected:
@@ -66,9 +65,10 @@ namespace MQTT {
 
         virtual bool write_payload(uint8_t *buf, size_t &bufpos) { }
 
+    public:
+
         virtual uint8_t response_type(void) const { return 0; }
 
-    public:
         // Send the message out
         bool send(Stream &stream, size_t block_size = MQTT_SEND_BLOCK_SIZE);
         bool send(Stream &stream, uint8_t *buffer, size_t block_size = MQTT_SEND_BLOCK_SIZE);
@@ -90,7 +90,7 @@ namespace MQTT {
 
         bool write_payload(uint8_t *buf, size_t &bufpos);
 
-        uint8_t response_type(void) const;
+
 
         virtual void init(String topic, uint8_t *payload, size_t len) {
             _topic = topic;
@@ -115,6 +115,8 @@ namespace MQTT {
             }
             init(topic, (uint8_t *) payload, len);
         }
+
+        uint8_t response_type(void) const;
 
         // Get or set retain flag
         bool retain(void) const { return (bool) (_flags & 0x01); }
@@ -218,6 +220,100 @@ namespace MQTT {
         virtual uint8_t *payload(void) const { return (uint8_t *) _buffer; }
 
         virtual char *payload_string(void) const { return (char *) _buffer; }
+    };
+
+    // Response to Publish when qos == 1
+    class PublishAck : public Message {
+    private:
+        bool write_variable_header(uint8_t *buf, size_t &bufpos) { }
+
+    public:
+        // Construct with a packet id
+        PublishAck(uint16_t pid);
+
+        // Construct from a network buffer
+        PublishAck(uint8_t *data, size_t length);
+    };
+
+
+    // First response to Publish when qos == 2
+    class PublishRec : public Message {
+    private:
+        bool write_variable_header(uint8_t *buf, size_t &bufpos);
+    public:
+        // Construct with a packet id
+        PublishRec(uint16_t pid);
+
+        // Construct from a network buffer
+        PublishRec(uint8_t *data, size_t length);
+
+        uint8_t response_type(void) const { return MQTT_PUBREL; }
+
+    };
+
+
+    // Response to PublishRec
+    class PublishRel : public Message {
+    private:
+        bool write_variable_header(uint8_t *buf, size_t &bufpos);
+
+    public:
+        // Construct with a packet id
+        PublishRel(uint16_t pid);
+
+        // Construct from a network buffer
+        PublishRel(uint8_t *data, size_t length);
+
+        uint8_t response_type(void) const { return MQTT_PUBCOMP; }
+
+    };
+
+
+    // Response to PublishRel
+    class PublishComp : public Message {
+    private:
+        bool write_variable_header(uint8_t *buf, size_t &bufpos);
+
+    public:
+        // Construct with a packet id
+        PublishComp(uint16_t pid);
+
+        // Construct from a network buffer
+        PublishComp(uint8_t *data, size_t length);
+    };
+
+    // Ping the broker
+    class Ping : public Message {
+    private:
+        bool write_variable_header(uint8_t *buf, size_t &bufpos) { }
+    public:
+        // Constructor
+        Ping() :
+                Message(MQTT_PINGREQ) { }
+
+        // Construct from a network buffer
+        Ping(uint8_t *data, size_t length) :
+                Message(MQTT_PINGREQ) { }
+
+        uint8_t response_type(void) const { return MQTT_PINGRESP; }
+
+    };
+
+
+    // Response to Ping
+    class PingResp : public Message {
+    private:
+        bool write_variable_header(uint8_t *buf, size_t &bufpos) { }
+
+    public:
+        // Constructor
+        PingResp() :
+                Message(MQTT_PINGRESP) { }
+
+        // Construct from a network buffer
+        PingResp(uint8_t *data, size_t length) :
+                Message(MQTT_PINGRESP) { }
+
     };
 }
 

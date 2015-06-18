@@ -58,6 +58,8 @@ private:
 
     WiFiClient _client;
     uint8_t buffer[MQTT_MAX_PACKET_SIZE];
+    uint16_t keepalive = MQTT_KEEPALIVE;
+    uint8_t _max_retries;
     uint16_t nextMsgId;
     unsigned long lastOutActivity;
     unsigned long lastInActivity;
@@ -73,13 +75,18 @@ private:
 
     mqtt_packet_t readPacket();
 
+    MQTT::Message *readMessage();
+
     uint8_t readByte();
 
     bool write(uint8_t header, uint8_t *buf, uint16_t length);
 
     uint16_t writeString(String string, uint8_t *buf, uint16_t pos);
 
-    bool processPacket(mqtt_packet_t &packet, uint8_t wait_type = 0, uint16_t wait_pid = 0);
+    // Wait for a certain type of packet to come back, optionally check its packet id
+    bool wait_for(uint8_t wait_type, uint16_t wait_pid = 0);
+
+    bool processMessage(MQTT::Message *msg, uint8_t match_type = 0, uint16_t match_pid = 0);
 
 
 public:
@@ -104,6 +111,12 @@ public:
     PubSubClient &set_callback(callback_t cb, void *data = NULL);
 
     PubSubClient &unset_callback(void);
+
+    // Set the maximum number of retries when waiting for response packets
+    PubSubClient &set_max_retries(uint8_t mr) {
+        _max_retries = mr;
+        return *this;
+    }
 
     Stream *stream(void) const { return _stream; }
 

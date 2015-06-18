@@ -165,4 +165,59 @@ namespace MQTT {
 
     }
 
+    // PublishAck class
+    PublishAck::PublishAck(uint16_t pid) :
+            Message(MQTT_PUBACK, pid) { }
+
+    PublishAck::PublishAck(uint8_t *data, size_t length) :
+            Message(MQTT_PUBACK) {
+        size_t pos = 0;
+        _packet_id = read<uint16_t>(data, pos);
+    }
+
+
+    // PublishRec class
+    PublishRec::PublishRec(uint16_t pid) :
+            Message(MQTT_PUBREC, pid) { }
+
+    PublishRec::PublishRec(uint8_t *data, size_t length) :
+            Message(MQTT_PUBREC) {
+        size_t pos = 0;
+        _packet_id = read<uint16_t>(data, pos);
+    }
+
+    bool PublishRec::write_variable_header(uint8_t *buf, size_t &bufpos) {
+        write_packet_id(buf, bufpos);
+    }
+
+
+    // PublishRel class
+    PublishRel::PublishRel(uint16_t pid) :
+            Message(MQTT_PUBREL, pid) { }
+
+    PublishRel::PublishRel(uint8_t *data, size_t length) :
+            Message(MQTT_PUBREL) {
+        size_t pos = 0;
+        _packet_id = read<uint16_t>(data, pos);
+    }
+
+    bool PublishRel::write_variable_header(uint8_t *buf, size_t &bufpos) {
+        write_packet_id(buf, bufpos);
+    }
+
+
+    // PublishComp class
+    PublishComp::PublishComp(uint16_t pid) :
+            Message(MQTT_PUBREC, pid) { }
+
+    PublishComp::PublishComp(uint8_t *data, size_t length) :
+            Message(MQTT_PUBCOMP) {
+        size_t pos = 0;
+        _packet_id = read<uint16_t>(data, pos);
+    }
+
+    bool PublishComp::write_variable_header(uint8_t *buf, size_t &bufpos) {
+        write_packet_id(buf, bufpos);
+    }
+
 }

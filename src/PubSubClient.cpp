@@ -9,11 +9,13 @@
 #include <string.h>
 
 PubSubClient::PubSubClient() :
+        _max_retries(10),
         _callback(NULL),
         _callback_data(NULL),
         _stream(NULL) { }
 
 PubSubClient::PubSubClient(IPAddress &ip, uint16_t port, bool ssl) :
+        _max_retries(10),
         _callback(NULL),
         _callback_data(NULL),
         _stream(NULL),
@@ -22,6 +24,7 @@ PubSubClient::PubSubClient(IPAddress &ip, uint16_t port, bool ssl) :
         _ssl(ssl) { }
 
 PubSubClient::PubSubClient(String hostname, uint16_t port, bool ssl) :
+        _max_retries(10),
         _callback(NULL),
         _callback_data(NULL),
         _stream(NULL),
@@ -230,38 +233,101 @@ mqtt_packet_t PubSubClient::readPacket() {
     return packet;
 }
 
-bool PubSubClient::processPacket(mqtt_packet_t &packet, uint8_t wait_type, uint16_t wait_pid) {
-    uint8_t type = (uint8_t) (buffer[0] & 0xF0);
+MQTT::Message *PubSubClient::readMessage() {
+    mqtt_packet_t packet = readPacket();
+    uint8_t type = packet.header >> 4;
+    uint8_t flags = (uint8_t) (packet.header & 0x0f);
 
-    if (type == MQTTPUBLISH) {
-        MQTT::BufferedPublish pub(packet.header, packet.data, packet.length);
-        if (_callback) {
-            _callback(pub, _callback_data);
-        }
-
-        if (pub.qos() == 1) {
-            buffer[0] = MQTTPUBACK;
-            buffer[1] = 2;
-            buffer[2] = (uint8_t) (pub.packet_id() >> 8);
-            buffer[3] = (uint8_t) (pub.packet_id() & 0xFF);
-            send(buffer, 4);
-            lastOutActivity = millis();
-        }
-    } else if (type == MQTTPINGREQ) {
-        buffer[0] = MQTTPINGRESP;
-        buffer[1] = 0;
-        send(buffer, 2);
-    } else if (type == MQTTPINGRESP) {
-        pingOutstanding = false;
+    MQTT::Message *message = NULL;
+    switch (type) {
+        case MQTT_CONNACK:
+            break;
+        case MQTT_PUBLISH:
+            message = new MQTT::BufferedPublish(flags, packet.data, packet.length);
+            break;
+        case MQTT_PUBACK:
+            message = new MQTT::PublishAck(packet.data, packet.length);
+            break;
+        case MQTT_PUBREC:
+            message = new MQTT::PublishRec(packet.data, packet.length);
+            break;
+        case MQTT_PUBREL:
+            message = new MQTT::PublishRel(packet.data, packet.length);
+            break;
+        case MQTT_PUBCOMP:
+            message = new MQTT::PublishComp(packet.data, packet.length);
+            break;
+        case MQTT_SUBACK:
+            break;
+        case MQTT_UNSUBACK:
+            break;
+        case MQTT_PINGREQ:
+            message = new MQTT::Ping(packet.data, packet.length);
+            break;
+        case MQTT_PINGRESP:
+            message = new MQTT::PingResp(packet.data, packet.length);
+            break;
+        default:
+            break;
     }
-    return false;
+
+    return message;
 }
 
+
+bool PubSubClient::processMessage(MQTT::Message *msg, uint8_t match_type, uint16_t match_pid) {
+    lastInActivity = millis();
+    if (msg->type() == match_type) {
+        if (match_pid)
+            return msg->packet_id() == match_pid;
+        return true;
+    }
+
+    switch (msg->type()) {
+        case MQTT_PUBLISH: {
+            MQTT::Publish *pub = static_cast<MQTT::Publish *>(msg);    // RTTI is disabled, so no dynamic_cast<>()
+
+            if (_callback)
+                _callback(*pub, _callback_data);
+
+            if (pub->qos() == 1) {
+                MQTT::PublishAck puback(pub->packet_id());
+                puback.send(_client);
+                lastOutActivity = millis();
+
+            } else if (pub->qos() == 2) {
+                uint8_t retries = 0;
+
+                MQTT::PublishRec pubrec(pub->packet_id());
+                if (!sendReliably(pubrec))
+                    return false;
+
+                MQTT::PublishComp pubcomp(pub->packet_id());
+                pubcomp.send(_client);
+                lastOutActivity = millis();
+            }
+
+            break;
+        }
+
+        case MQTT_PINGREQ: {
+            MQTT::PingResp pr;
+            pr.send(_client);
+            lastOutActivity = millis();
+            break;
+        }
+
+        case MQTT_PINGRESP:
+            pingOutstanding = false;
+    }
+
+    return false;
+}
 
 bool PubSubClient::loop() {
     if (connected()) {
         unsigned long t = millis();
-        if ((t - lastInActivity > MQTT_KEEPALIVE * 1000UL) || (t - lastOutActivity > MQTT_KEEPALIVE * 1000UL)) {
+        if ((t - lastInActivity > keepalive * 1000UL) || (t - lastOutActivity > keepalive * 1000UL)) {
             if (pingOutstanding) {
                 _client.stop();
                 return false;
@@ -275,15 +341,39 @@ bool PubSubClient::loop() {
             }
         }
         if (_client.available()) {
-            mqtt_packet_t packet = readPacket();
-            if (packet.length > 0) {
-                lastInActivity = t;
-                processPacket(packet);
+
+            MQTT::Message *msg = readMessage();
+            if (msg) {
+                processMessage(msg);
+                delete(msg);
             }
 
         }
         return true;
     }
+    return false;
+}
+
+bool PubSubClient::wait_for(uint8_t match_type, uint16_t match_pid) {
+    while (!_client.available()) {
+        if (millis() - lastInActivity > keepalive * 1000UL)
+            return false;
+        delayMicroseconds(100);
+    }
+
+    while (millis() < lastInActivity + (keepalive * 1000)) {
+        // Read the packet and check it
+        MQTT::Message *msg = readMessage();
+        if (msg != NULL) {
+            bool ret = processMessage(msg, match_type, match_pid);
+            delete msg;
+            if (ret)
+                return true;
+        }
+
+        delayMicroseconds(100);
+    }
+
     return false;
 }
 
@@ -293,7 +383,7 @@ bool PubSubClient::publish(String topic, String payload) {
 
 bool PubSubClient::publish(String topic, const uint8_t *payload, unsigned int plength, bool retained) {
     if (connected()) {
-        MQTT::Publish pub(topic, (uint8_t *)payload, plength);
+        MQTT::Publish pub(topic, (uint8_t *) payload, plength);
         pub.set_retain(retained);
         return publish(pub);
     }
@@ -459,25 +549,27 @@ bool PubSubClient::publish(MQTT::Publish &pub) {
         return false;
 
     switch (pub.qos()) {
-        case 0:
+        case 0: {
             send(pub);
             lastOutActivity = millis();
             break;
-
-        case 1:
+        }
+        case 1: {
             if (!sendReliably(pub))
                 return false;
             break;
+        }
 
-//        case 2:
-//            if (!send_reliably(&pub))
-//                return false;
-//
-//            MQTT::PublishRel pubrel(pub.packet_id());
-//            if (!send_reliably(&pubrel))
-//                return false;
-//
-//            break;
+        case 2: {
+            if (!sendReliably(pub))
+                return false;
+
+            MQTT::PublishRel pubrel(pub.packet_id());
+            if (!sendReliably(pubrel))
+                return false;
+
+            break;
+        }
         default:
             break;
     }
@@ -486,6 +578,20 @@ bool PubSubClient::publish(MQTT::Publish &pub) {
 }
 
 bool PubSubClient::sendReliably(MQTT::Message &message) {
-    // TODO implement send reliably
-    return send(message);
+    uint8_t retries = 0;
+    send:
+    send(message);
+    lastOutActivity = millis();
+
+    if (message.response_type() == 0)
+        return true;
+
+    if (!wait_for(message.response_type(), message.packet_id())) {
+        if (retries < _max_retries) {
+            retries++;
+            goto send;
+        }
+        return false;
+    }
+    return true;
 }

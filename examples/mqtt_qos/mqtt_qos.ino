@@ -57,8 +57,8 @@ void setup() {
         client.publish(MQTT::Publish("outTopic", "hello world qos=1")
                                .set_qos(1, client.next_packet_id()));
 
-//    client.publish(MQTT::Publish("outTopic", "hello world qos=2")
-//                   .set_qos(2, client.next_packet_id()));
+        client.publish(MQTT::Publish("outTopic", "hello world qos=2")
+                               .set_qos(2, client.next_packet_id()));
     }
 
 }

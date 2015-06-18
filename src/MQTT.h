@@ -12,7 +12,17 @@
 #define MAX_PAYLOAD_BUFFER_ZISE 8196
 
 namespace MQTT {
-    class Publish {
+    class Message {
+    protected:
+        uint16_t _packet_id;
+
+    public:
+
+        uint16_t packet_id() const { return _packet_id; }
+    };
+
+    class Publish: public Message {
+
     public:
         virtual char *topic(void) const = 0;
         virtual uint8_t *payload(void) const = 0;

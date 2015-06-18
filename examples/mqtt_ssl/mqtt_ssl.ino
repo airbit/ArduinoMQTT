@@ -26,7 +26,7 @@ void callback(const MQTT::Publish &pub, void*pdata) {
     // handle message arrived
 }
 
-PubSubClient client(server, 4883);
+PubSubClient client(server, 4883, true);
 
 void setup() {
     // Setup console
@@ -50,7 +50,7 @@ void setup() {
         Serial.println("WiFi connected");
     }
 
-    if (client.sslconnect("arduinoClient")) {
+    if (client.connect("arduinoClient")) {
         client.publish("outTopic", "hello world");
         client.subscribe("inTopic");
     }

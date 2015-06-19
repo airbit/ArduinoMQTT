@@ -103,9 +103,11 @@ namespace MQTT {
         size_t real_len = remaining_length + fixed_len;
         memcpy(real_packet, fixed_header, fixed_len);
 
-//        Serial.println("Sending Packet:");
+//        Serial.print("Sending Packet(");
+//        Serial.print(real_len);
+//        Serial.println("):");
 //        for (int i = 0; i < real_len; ++i) {
-//            Serial.print(real_packet[i]);
+//            Serial.print(real_packet[i], 16);
 //            Serial.print(" ");
 //        }
 //        Serial.println();

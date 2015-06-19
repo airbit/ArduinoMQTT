@@ -9,7 +9,7 @@
 
 #include <Arduino.h>
 #include <Stream.h>
-#include <WiFi/WiFiClient.h>
+#include <WiFi.h>
 #include <IPAddress.h>
 #include "MQTT.h"
 
